@@ -1,0 +1,91 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "name": "Logto",
+  "description": "Logto authentication platform with PostgreSQL and Redis",
+  "keywords": ["auth", "authentication", "logto", "postgres", "redis"],
+  "projectName": "logto",
+  "services": [
+    {
+      "name": "Postgres",
+      "image": "ghcr.io/railwayapp-templates/postgres-ssl:14",
+      "volumes": [
+        {
+          "name": "postgres_data",
+          "mountPath": "/var/lib/postgresql/data"
+        }
+      ],
+      "variables": {
+        "POSTGRES_USER": {
+          "description": "PostgreSQL username",
+          "default": "postgres"
+        },
+        "POSTGRES_PASSWORD": {
+          "description": "PostgreSQL password",
+          "default": "${{ secret() }}"
+        },
+        "POSTGRES_DB": {
+          "description": "PostgreSQL database name",
+          "default": "logto"
+        },
+        "PGDATA": {
+          "default": "/var/lib/postgresql/data/pgdata"
+        }
+      }
+    },
+    {
+      "name": "Redis",
+      "image": "redis:8.6.2",
+      "volumes": [
+        {
+          "name": "redis_data",
+          "mountPath": "/data"
+        }
+      ],
+      "variables": {
+        "REDIS_PASSWORD": {
+          "description": "Redis password",
+          "default": "${{ secret() }}"
+        }
+      },
+      "startCommand": "redis-server --requirepass $REDIS_PASSWORD --save 60 1 --dir /data"
+    },
+    {
+      "name": "Logto",
+      "image": "svhd/logto",
+      "variables": {
+        "DB_URL": {
+          "description": "Database connection URL",
+          "value": "postgresql://${{ Postgres.POSTGRES_USER }}:${{ Postgres.POSTGRES_PASSWORD }}@${{ Postgres.RAILWAY_PRIVATE_DOMAIN }}:5432/${{ Postgres.POSTGRES_DB }}"
+        },
+        "REDIS_URL": {
+          "description": "Redis connection URL",
+          "value": "redis://default:${{ Redis.REDIS_PASSWORD }}@${{ Redis.RAILWAY_PRIVATE_DOMAIN }}:6379"
+        },
+        "ENDPOINT": {
+          "description": "Public endpoint URL",
+          "default": "http://localhost:3001"
+        },
+        "ADMIN_ENDPOINT": {
+          "description": "Admin endpoint URL",
+          "default": "http://localhost:3002"
+        },
+        "PORT": {
+          "default": "3001"
+        },
+        "ADMIN_PORT": {
+          "default": "3002"
+        },
+        "TRUST_PROXY_HEADER": {
+          "default": "1"
+        }
+      },
+      "volumes": [
+        {
+          "name": "logto_connectors",
+          "mountPath": "/etc/logto/packages/core/connectors"
+        }
+      ],
+      "startCommand": "sh -c \"npm run cli -- connector add --official && npm run cli -- connector link && npm run cli -- db seed --swe && npm run cli -- db alteration deploy next && npm run start\""
+    }
+  ]
+}
